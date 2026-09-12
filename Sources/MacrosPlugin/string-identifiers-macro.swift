@@ -44,7 +44,7 @@ public struct StringIdentifiersMacro: MemberAttributeMacro {
         providingAttributesFor member: some DeclSyntaxProtocol,
         in _: some MacroExpansionContext
     ) throws -> [AttributeSyntax] {
-        guard let variable = member.as(
+        guard member.is(
             VariableDeclSyntax.self
         ) else {
             return []
