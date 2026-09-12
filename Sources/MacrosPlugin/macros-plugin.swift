@@ -8,5 +8,6 @@ struct MacrosPlugin: CompilerPlugin {
         SchemaPropertyMacro.self,
         APIMacro.self,
         StringIdentifiersMacro.self,
+        StringIdentifierMemberMacro.self,
     ]
 }

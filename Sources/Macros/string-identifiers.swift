@@ -1,26 +1,31 @@
 import Primitives
 
-/// Generates static StringIdentifier members from declared member names.
+/// Synthesizes get-only StringIdentifier values for declared static members.
 ///
-/// By default, each generated raw value exactly matches its member name.
-/// `rawValueCasing` can transform the member spelling into a different
-/// serialized representation.
-///
+///     @StringIdentifiers(casing: .snake)
 ///     public extension ExampleIdentifier {
-///         #StringIdentifiers(
-///             "firstValue",
-///             "secondValue",
-///             rawValueCasing: .snake
-///         )
+///         static var firstValue: Self
+///         static var secondValue: Self
 ///     }
 ///
-/// This generates members whose raw values are `first_value` and
-/// `second_value` respectively.
-@freestanding(declaration, names: arbitrary)
+/// The generated getters return values whose raw strings are `first_value`
+/// and `second_value` respectively.
+///
+/// When `casing` is omitted, the member spelling is used as the raw value.
+@attached(memberAttribute)
 public macro StringIdentifiers(
-    _ names: String...,
-    rawValueCasing: Casing? = nil
+    casing: Casing? = nil
 ) = #externalMacro(
     module: "MacrosPlugin",
     type: "StringIdentifiersMacro"
+)
+
+/// Implementation detail used by `@StringIdentifiers` to synthesize each
+/// declared member's getter.
+@attached(accessor)
+public macro _StringIdentifier(
+    casing: Casing? = nil
+) = #externalMacro(
+    module: "MacrosPlugin",
+    type: "StringIdentifierMemberMacro"
 )
