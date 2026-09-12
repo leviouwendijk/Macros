@@ -7,5 +7,6 @@ struct MacrosPlugin: CompilerPlugin {
         JSONSchemaMacro.self,
         SchemaPropertyMacro.self,
         APIMacro.self,
+        StringIdentifiersMacro.self,
     ]
 }
