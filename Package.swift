@@ -15,6 +15,12 @@ let package = Package(
                 "Macros",
             ]
         ),
+        .library(
+            name: "MacroEngine",
+            targets: [
+                "MacroEngine",
+            ]
+        ),
         .executable(
             name: "macrotest",
             targets: [
@@ -49,6 +55,23 @@ let package = Package(
                     package: "Schema"
                 ),
                 "MacrosPlugin",
+            ]
+        ),
+        .target(
+            name: "MacroEngine",
+            dependencies: [
+                .product(
+                    name: "SwiftSyntax",
+                    package: "swift-syntax"
+                ),
+                .product(
+                    name: "SwiftSyntaxBuilder",
+                    package: "swift-syntax"
+                ),
+                .product(
+                    name: "SwiftSyntaxMacros",
+                    package: "swift-syntax"
+                ),
             ]
         ),
         .executableTarget(
