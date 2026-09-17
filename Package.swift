@@ -15,6 +15,12 @@ let package = Package(
                 "Macros",
             ]
         ),
+        .executable(
+            name: "macrotest",
+            targets: [
+                "MacroTest",
+            ]
+        ),
     ],
     dependencies: [
         .package(
@@ -43,6 +49,13 @@ let package = Package(
                     package: "Schema"
                 ),
                 "MacrosPlugin",
+            ]
+        ),
+        .executableTarget(
+            name: "MacroTest",
+            dependencies: [
+                "Macros",
+                "Schema",
             ]
         ),
         .macro(

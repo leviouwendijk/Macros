@@ -110,7 +110,9 @@ private extension JSONSchemaMacro {
                 )
             }
 
-            let sourceName = pattern.identifier.text
+            let sourceName = semanticIdentifier(
+                pattern.identifier
+            )
             let name: String
 
             if let keys {
@@ -227,7 +229,9 @@ private extension JSONSchemaMacro {
                     }
                     values.append(raw)
                 } else {
-                    values.append(element.name.text)
+                    values.append(
+                        semanticIdentifier(element.name)
+                    )
                 }
             }
         }
@@ -264,7 +268,9 @@ private extension JSONSchemaMacro {
                         parameter
                     in
                         let firstName =
-                            parameter.firstName?.text
+                            parameter.firstName.map(
+                                semanticIdentifier
+                            )
                         let name =
                             if let firstName,
                                firstName != "_"
@@ -301,7 +307,7 @@ private extension JSONSchemaMacro {
                     """
                     JSONSchema.object {
                         JSONSchema.Property(
-                            name: \(literal(element.name.text)),
+                            name: \(literal(semanticIdentifier(element.name))),
                             schema: \(payload),
                             required: true,
                             description: \(caseDescription)
@@ -376,7 +382,9 @@ private extension JSONSchemaMacro {
             }
 
             for element in cases.elements {
-                let source = element.name.text
+                let source = semanticIdentifier(
+                    element.name
+                )
                 if let expression = element.rawValue?.value {
                     guard let value = simpleLiteral(expression) else {
                         throw MacroExpansionErrorMessage(
@@ -464,6 +472,23 @@ private extension JSONSchemaMacro {
         }
 
         return type.trimmedDescription
+    }
+
+    static func semanticIdentifier(
+        _ token: TokenSyntax
+    ) -> String {
+        let source = token.trimmedDescription
+
+        guard
+            source.first == "`",
+            source.last == "`"
+        else {
+            return token.text
+        }
+
+        return String(
+            source.dropFirst().dropLast()
+        )
     }
 
     static func simpleLiteral(_ expression: ExprSyntax) -> String? {
