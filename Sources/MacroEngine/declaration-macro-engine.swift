@@ -20,19 +20,26 @@ public struct DeclarationMacroContext:
     public let kind: DeclarationMacroKind
     public let name: String
     public let access: String?
+    public let lexicalScope: [String]
 
     public init(
         kind: DeclarationMacroKind,
         name: String,
-        access: String?
+        access: String?,
+        lexicalScope: [String] = []
     ) {
         self.kind = kind
         self.name = name
         self.access = access
+        self.lexicalScope = lexicalScope
     }
 
     public var accessPrefix: String {
         access.map { "\($0) " } ?? ""
+    }
+
+    public var lexicalPath: [String] {
+        lexicalScope + [name]
     }
 }
 
@@ -66,12 +73,14 @@ public enum DeclarationMacroEngine<
 > {
     public static func members(
         of declaration: some DeclGroupSyntax,
-        macroName: String
+        macroName: String,
+        lexicalContext: [Syntax] = []
     ) throws -> [DeclSyntax] {
         try Specification.members(
             in: context(
                 for: declaration,
-                macroName: macroName
+                macroName: macroName,
+                lexicalContext: lexicalContext
             )
         )
     }
@@ -79,11 +88,13 @@ public enum DeclarationMacroEngine<
     public static func extensions(
         of declaration: some DeclGroupSyntax,
         type: some TypeSyntaxProtocol,
-        macroName: String
+        macroName: String,
+        lexicalContext: [Syntax] = []
     ) throws -> [ExtensionDeclSyntax] {
         let context = try context(
             for: declaration,
-            macroName: macroName
+            macroName: macroName,
+            lexicalContext: lexicalContext
         )
         let members = try Specification.extensionMembers(
             in: context
@@ -127,41 +138,46 @@ public enum DeclarationMacroEngine<
 private extension DeclarationMacroEngine {
     static func context(
         for declaration: some DeclGroupSyntax,
-        macroName: String
+        macroName: String,
+        lexicalContext: [Syntax]
     ) throws -> DeclarationMacroContext {
         if let value = declaration.as(StructDeclSyntax.self) {
             return try context(
                 kind: .struct,
-                name: value.name.text,
+                name: identifierName(value.name),
                 modifiers: value.modifiers,
-                macroName: macroName
+                macroName: macroName,
+                lexicalContext: lexicalContext
             )
         }
 
         if let value = declaration.as(EnumDeclSyntax.self) {
             return try context(
                 kind: .enum,
-                name: value.name.text,
+                name: identifierName(value.name),
                 modifiers: value.modifiers,
-                macroName: macroName
+                macroName: macroName,
+                lexicalContext: lexicalContext
             )
         }
 
         if let value = declaration.as(ClassDeclSyntax.self) {
             return try context(
                 kind: .class,
-                name: value.name.text,
+                name: identifierName(value.name),
                 modifiers: value.modifiers,
-                macroName: macroName
+                macroName: macroName,
+                lexicalContext: lexicalContext
             )
         }
 
         if let value = declaration.as(ActorDeclSyntax.self) {
             return try context(
                 kind: .actor,
-                name: value.name.text,
+                name: identifierName(value.name),
                 modifiers: value.modifiers,
-                macroName: macroName
+                macroName: macroName,
+                lexicalContext: lexicalContext
             )
         }
 
@@ -174,7 +190,8 @@ private extension DeclarationMacroEngine {
         kind: DeclarationMacroKind,
         name: String,
         modifiers: DeclModifierListSyntax,
-        macroName: String
+        macroName: String,
+        lexicalContext: [Syntax]
     ) throws -> DeclarationMacroContext {
         guard Specification.supportedKinds.contains(kind) else {
             let supported = Specification.supportedKinds
@@ -190,7 +207,113 @@ private extension DeclarationMacroEngine {
         return DeclarationMacroContext(
             kind: kind,
             name: name,
-            access: access(in: modifiers)
+            access: access(in: modifiers),
+            lexicalScope: try lexicalScope(
+                for: name,
+                in: lexicalContext,
+                macroName: macroName
+            )
+        )
+    }
+
+    static func lexicalScope(
+        for declarationName: String,
+        in lexicalContext: [Syntax],
+        macroName: String
+    ) throws -> [String] {
+        var contexts = lexicalContext[...]
+
+        if
+            let first = contexts.first,
+            nominalName(in: first) == declarationName
+        {
+            contexts = contexts.dropFirst()
+        }
+
+        var components: [String] = []
+
+        for syntax in contexts.reversed() {
+            if let declaration = syntax.as(ExtensionDeclSyntax.self) {
+                guard let path = typePath(declaration.extendedType) else {
+                    throw MacroExpansionErrorMessage(
+                        "@\(macroName) could not derive a lexical path from extension type '\(declaration.extendedType.trimmedDescription)'."
+                    )
+                }
+
+                components.append(contentsOf: path)
+                continue
+            }
+
+            if let name = nominalName(in: syntax) {
+                components.append(name)
+            }
+        }
+
+        return components
+    }
+
+    static func nominalName(
+        in syntax: Syntax
+    ) -> String? {
+        if let value = syntax.as(StructDeclSyntax.self) {
+            return identifierName(value.name)
+        }
+
+        if let value = syntax.as(EnumDeclSyntax.self) {
+            return identifierName(value.name)
+        }
+
+        if let value = syntax.as(ClassDeclSyntax.self) {
+            return identifierName(value.name)
+        }
+
+        if let value = syntax.as(ActorDeclSyntax.self) {
+            return identifierName(value.name)
+        }
+
+        if let value = syntax.as(ProtocolDeclSyntax.self) {
+            return identifierName(value.name)
+        }
+
+        return nil
+    }
+
+    static func typePath(
+        _ type: TypeSyntax
+    ) -> [String]? {
+        if let identifier = type.as(IdentifierTypeSyntax.self) {
+            return [
+                identifierName(identifier.name),
+            ]
+        }
+
+        if let member = type.as(MemberTypeSyntax.self) {
+            guard let base = typePath(member.baseType) else {
+                return nil
+            }
+
+            return base + [
+                identifierName(member.name),
+            ]
+        }
+
+        return nil
+    }
+
+    static func identifierName(
+        _ token: TokenSyntax
+    ) -> String {
+        let source = token.trimmedDescription
+
+        guard
+            source.first == "`",
+            source.last == "`"
+        else {
+            return token.text
+        }
+
+        return String(
+            source.dropFirst().dropLast()
         )
     }
 

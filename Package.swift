@@ -78,7 +78,16 @@ let package = Package(
             name: "MacroTest",
             dependencies: [
                 "Macros",
+                "MacroEngine",
                 "Schema",
+                .product(
+                    name: "SwiftSyntax",
+                    package: "swift-syntax"
+                ),
+                .product(
+                    name: "SwiftSyntaxBuilder",
+                    package: "swift-syntax"
+                ),
             ]
         ),
         .macro(

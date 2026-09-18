@@ -62,12 +62,14 @@ private func expect(
     }
 }
 
-@main
+try MacroTest.main()
+
 private struct MacroTest {
     static func main() throws {
         try testStringEnum()
         try testEscapedProperty()
         try testAssociatedEnum()
+        try runDeclarationMacroEngineTests()
 
         print("macrotest: pass")
     }
