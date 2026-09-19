@@ -88,6 +88,7 @@ public enum DeclarationMacroEngine<
     public static func extensions(
         of declaration: some DeclGroupSyntax,
         type: some TypeSyntaxProtocol,
+        conformingTo protocols: [TypeSyntax],
         macroName: String,
         lexicalContext: [Syntax] = []
     ) throws -> [ExtensionDeclSyntax] {
@@ -100,13 +101,25 @@ public enum DeclarationMacroEngine<
             in: context
         )
 
-        guard Specification.conformance != nil || !members.isEmpty else {
+        let needsConformance: Bool
+        if let required = Specification.conformance {
+            needsConformance = protocols.contains { protocolType in
+                let actual = protocolType.trimmedDescription
+
+                return actual == required
+                    || actual.hasSuffix(".\(required)")
+            }
+        } else {
+            needsConformance = false
+        }
+
+        guard needsConformance || !members.isEmpty else {
             return []
         }
 
-        let inheritance = Specification.conformance.map {
-            ": \($0)"
-        } ?? ""
+        let inheritance = needsConformance
+            ? ": \(Specification.conformance!)"
+            : ""
 
         let body = members
             .map(\.trimmedDescription)

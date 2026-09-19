@@ -25,8 +25,18 @@ public struct JSONSchemaMacro: ExtensionMacro {
             )
         }
 
+        let needsConformance = protocols.contains { protocolType in
+            let actual = protocolType.trimmedDescription
+
+            return actual == "JSONSchemaProviding"
+                || actual.hasSuffix(".JSONSchemaProviding")
+        }
+        let inheritance = needsConformance
+            ? ": JSONSchemaProviding"
+            : ""
+
         let source = """
-        extension \(type.trimmedDescription): JSONSchemaProviding {
+        extension \(type.trimmedDescription)\(inheritance) {
             \(access(declaration))static var jsonschema: JSONSchema {
         \(indent(schema, by: 8))
             }

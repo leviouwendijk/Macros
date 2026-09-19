@@ -70,6 +70,7 @@ private struct MacroTest {
         try testEscapedProperty()
         try testAssociatedEnum()
         try runDeclarationMacroEngineTests()
+        try runDeclarationMacroConformanceTests()
 
         print("macrotest: pass")
     }

@@ -55,3 +55,14 @@ private let jsonschemaMacroProbe =
 
 private let jsonschemaAssociatedEnumProbe =
     JSONSchemaAssociatedEnumProbe.jsonschema
+
+@JSONSchema
+internal struct JSONSchemaExistingConformanceProbe:
+    Codable,
+    JSONSchemaProviding
+{
+    let value: String
+}
+
+private let jsonschemaExistingConformanceProbe =
+    JSONSchemaExistingConformanceProbe.jsonschema
