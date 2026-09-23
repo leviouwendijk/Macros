@@ -40,6 +40,7 @@ private enum DeclarationMacroEngineTestError:
 func runDeclarationMacroEngineTests() throws {
     try testExtensionLexicalPath()
     try testNestedNominalLexicalPath()
+    try testCustomMembersInheritExtensionAccess()
 }
 
 private func testExtensionLexicalPath() throws {
@@ -90,6 +91,46 @@ private func testNestedNominalLexicalPath() throws {
         members,
         expected: "Business.Inferences.ComposeReply"
     )
+}
+
+private func testCustomMembersInheritExtensionAccess() throws {
+    let declaration = try composeReplyDeclaration()
+    let extensionDeclaration = try extensionDeclaration(
+        "public extension Business.Inferences {}"
+    )
+
+    let members = try DeclarationMacroEngine<
+        DeclarationPathProbeSpecification
+    >.members(
+        of: declaration,
+        macroName: "DeclarationPathProbe",
+        lexicalContext: [
+            Syntax(declaration),
+            Syntax(extensionDeclaration),
+        ]
+    ) { context in
+        [
+            DeclSyntax(
+                stringLiteral:
+                    "\(context.accessPrefix)static let declarationAccess = \"\(context.access ?? "none")\""
+            ),
+        ]
+    }
+
+    guard members.count == 1 else {
+        throw DeclarationMacroEngineTestError.failed(
+            "custom member probe emitted \(members.count) members"
+        )
+    }
+
+    let expected =
+        "public static let declarationAccess = \"public\""
+
+    guard members[0].trimmedDescription == expected else {
+        throw DeclarationMacroEngineTestError.failed(
+            "expected '\(expected)', received '\(members[0].trimmedDescription)'"
+        )
+    }
 }
 
 private func composeReplyDeclaration() throws -> StructDeclSyntax {

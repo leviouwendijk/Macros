@@ -76,8 +76,25 @@ public enum DeclarationMacroEngine<
         macroName: String,
         lexicalContext: [Syntax] = []
     ) throws -> [DeclSyntax] {
-        try Specification.members(
-            in: context(
+        try members(
+            of: declaration,
+            macroName: macroName,
+            lexicalContext: lexicalContext
+        ) { context in
+            try Specification.members(
+                in: context
+            )
+        }
+    }
+
+    public static func members(
+        of declaration: some DeclGroupSyntax,
+        macroName: String,
+        lexicalContext: [Syntax] = [],
+        build: (DeclarationMacroContext) throws -> [DeclSyntax]
+    ) throws -> [DeclSyntax] {
+        try build(
+            context(
                 for: declaration,
                 macroName: macroName,
                 lexicalContext: lexicalContext
@@ -220,7 +237,7 @@ private extension DeclarationMacroEngine {
         return DeclarationMacroContext(
             kind: kind,
             name: name,
-            access: access(in: modifiers),
+            access: access(in: modifiers) ?? extensionAccess(in: lexicalContext),
             lexicalScope: try lexicalScope(
                 for: name,
                 in: lexicalContext,
@@ -328,6 +345,25 @@ private extension DeclarationMacroEngine {
         return String(
             source.dropFirst().dropLast()
         )
+    }
+
+    static func extensionAccess(
+        in lexicalContext: [Syntax]
+    ) -> String? {
+        for syntax in lexicalContext.reversed() {
+            guard let declaration = syntax.as(
+                ExtensionDeclSyntax.self
+            ),
+            let access = access(
+                in: declaration.modifiers
+            ) else {
+                continue
+            }
+
+            return access
+        }
+
+        return nil
     }
 
     static func access(
