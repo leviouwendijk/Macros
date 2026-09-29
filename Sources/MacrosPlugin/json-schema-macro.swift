@@ -4,14 +4,13 @@ import SwiftSyntax
 import SwiftSyntaxBuilder
 import SwiftSyntaxMacros
 
-public struct JSONSchemaMacro: ExtensionMacro {
+public struct JSONSchemaMacro: MemberMacro, ExtensionMacro {
     public static func expansion(
-        of node: AttributeSyntax,
-        attachedTo declaration: some DeclGroupSyntax,
-        providingExtensionsOf type: some TypeSyntaxProtocol,
-        conformingTo protocols: [TypeSyntax],
+        of _: AttributeSyntax,
+        providingMembersOf declaration: some DeclGroupSyntax,
+        conformingTo _: [TypeSyntax],
         in context: some MacroExpansionContext
-    ) throws -> [ExtensionDeclSyntax] {
+    ) throws -> [DeclSyntax] {
         try rejectCustomCoding(declaration)
 
         let schema: String
@@ -25,29 +24,40 @@ public struct JSONSchemaMacro: ExtensionMacro {
             )
         }
 
+        let source = """
+        \(access(declaration, in: context))static var jsonschema: JSONSchema {
+        \(indent(schema, by: 4))
+        }
+        """
+
+        return [DeclSyntax(stringLiteral: source)]
+    }
+
+    public static func expansion(
+        of _: AttributeSyntax,
+        attachedTo _: some DeclGroupSyntax,
+        providingExtensionsOf type: some TypeSyntaxProtocol,
+        conformingTo protocols: [TypeSyntax],
+        in _: some MacroExpansionContext
+    ) throws -> [ExtensionDeclSyntax] {
         let needsConformance = protocols.contains { protocolType in
             let actual = protocolType.trimmedDescription
 
             return actual == "JSONSchemaProviding"
                 || actual.hasSuffix(".JSONSchemaProviding")
         }
-        let inheritance = needsConformance
-            ? ": JSONSchemaProviding"
-            : ""
 
-        let source = """
-        extension \(type.trimmedDescription)\(inheritance) {
-            \(access(declaration))static var jsonschema: JSONSchema {
-        \(indent(schema, by: 8))
-            }
+        guard needsConformance else {
+            return []
         }
-        """
+
+        let source = "extension \(type.trimmedDescription): JSONSchemaProviding {}"
 
         guard let value = DeclSyntax(stringLiteral: source)
             .as(ExtensionDeclSyntax.self)
         else {
             throw MacroExpansionErrorMessage(
-                "@JSONSchema failed to form its generated extension."
+                "@JSONSchema failed to form its generated conformance extension."
             )
         }
 
@@ -515,20 +525,63 @@ private extension JSONSchemaMacro {
 }
 
 private extension JSONSchemaMacro {
-    static func access(_ declaration: some DeclGroupSyntax) -> String {
-        if declaration.modifiers.contains(where: {
-            $0.name.text == "public" || $0.name.text == "open"
-        }) {
+    static func access(
+        _ declaration: some DeclGroupSyntax,
+        in context: some MacroExpansionContext
+    ) -> String {
+        if let value = declaredAccess(in: declaration.modifiers) {
+            return schemaAccessPrefix(value)
+        }
+
+        var contexts = context.lexicalContext[...]
+
+        // The compiler can include the annotated declaration itself first.
+        if let first = contexts.first {
+            if let current = declaration.as(StructDeclSyntax.self),
+               let lexical = first.as(StructDeclSyntax.self),
+               current.name.text == lexical.name.text {
+                contexts = contexts.dropFirst()
+            } else if let current = declaration.as(EnumDeclSyntax.self),
+                      let lexical = first.as(EnumDeclSyntax.self),
+                      current.name.text == lexical.name.text {
+                contexts = contexts.dropFirst()
+            }
+        }
+
+        // Extension defaults apply only to direct members.
+        guard let parent = contexts.first?.as(ExtensionDeclSyntax.self),
+              let value = declaredAccess(in: parent.modifiers)
+        else {
+            return ""
+        }
+
+        return schemaAccessPrefix(value)
+    }
+
+    static func declaredAccess(
+        in modifiers: DeclModifierListSyntax
+    ) -> String? {
+        for modifier in modifiers {
+            switch modifier.name.text {
+            case "open", "public", "package", "internal", "fileprivate", "private":
+                return modifier.name.text
+            default:
+                continue
+            }
+        }
+
+        return nil
+    }
+
+    static func schemaAccessPrefix(_ access: String) -> String {
+        switch access {
+        case "open", "public":
             return "public "
-        }
-
-        if declaration.modifiers.contains(where: {
-            $0.name.text == "package"
-        }) {
+        case "package":
             return "package "
+        default:
+            return ""
         }
-
-        return ""
     }
 
     static func docs(_ trivia: Trivia) -> String? {

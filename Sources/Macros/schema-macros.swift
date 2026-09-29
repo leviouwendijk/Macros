@@ -1,9 +1,12 @@
 import Schema
 
 @attached(
-    extension,
-    conformances: JSONSchemaProviding,
+    member,
     names: named(jsonschema)
+)
+@attached(
+    extension,
+    conformances: JSONSchemaProviding
 )
 public macro JSONSchema() =
     #externalMacro(

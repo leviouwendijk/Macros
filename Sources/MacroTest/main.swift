@@ -71,6 +71,7 @@ private struct MacroTest {
         try testAssociatedEnum()
         try runDeclarationMacroEngineTests()
         try runDeclarationMacroConformanceTests()
+        try runJSONSchemaScopeTests()
 
         print("macrotest: pass")
     }
