@@ -228,11 +228,14 @@ private extension JSONSchemaMacro {
         _ declaration: EnumDeclSyntax
     ) throws -> String {
         var values: [String] = []
+        var caseDescriptions: [(value: String, description: String)] = []
 
         for member in declaration.memberBlock.members {
             guard let cases = member.decl.as(EnumCaseDeclSyntax.self) else {
                 continue
             }
+
+            let caseDescription = docs(cases.leadingTrivia)
 
             for element in cases.elements {
                 guard element.parameterClause == nil else {
@@ -241,25 +244,37 @@ private extension JSONSchemaMacro {
                     )
                 }
 
+                let value: String
                 if let expression = element.rawValue?.value {
                     guard let raw = simpleLiteral(expression) else {
                         throw MacroExpansionErrorMessage(
                             "@JSONSchema requires simple literal String enum raw values."
                         )
                     }
-                    values.append(raw)
+                    value = raw
                 } else {
-                    values.append(
-                        semanticIdentifier(element.name)
-                    )
+                    value = semanticIdentifier(element.name)
+                }
+                values.append(value)
+
+                if let caseDescription {
+                    caseDescriptions.append((value, caseDescription))
                 }
             }
         }
 
+        // Omitted when no case is documented, keeping undocumented expansions unchanged.
+        let caseDescriptionsArgument = caseDescriptions.isEmpty
+            ? ""
+            : """
+            ,
+                caseDescriptions: [\(caseDescriptions.map { "\(literal($0.value)): \(literal($0.description))" }.joined(separator: ", "))]
+            """
+
         return """
         JSONSchema.string(
             description: \(optionalString(docs(declaration.leadingTrivia))),
-            cases: [\(values.map(literal).joined(separator: ", "))]
+            cases: [\(values.map(literal).joined(separator: ", "))]\(caseDescriptionsArgument)
         )
         """
     }

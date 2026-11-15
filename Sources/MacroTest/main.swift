@@ -15,6 +15,19 @@ private enum EscapedStringEnum:
 }
 
 @JSONSchema
+private enum DocumentedStringEnum:
+    String,
+    Codable,
+    Equatable
+{
+    /// The user stated it.
+    case stated
+    /// Assumed, not verified.
+    case assumed = "assumed-value"
+    case undocumented
+}
+
+@JSONSchema
 private struct EscapedProperty:
     Codable,
     Equatable
@@ -115,6 +128,18 @@ private struct MacroTest {
         try expect(
             decoded == .internal,
             "escaped String enum Codable decoding must accept the semantic identifier"
+        )
+
+        try expect(
+            EscapedStringEnum.jsonschema.caseDescriptions.isEmpty,
+            "undocumented String enum cases carry no case descriptions"
+        )
+        try expect(
+            DocumentedStringEnum.jsonschema.caseDescriptions == [
+                "stated": "The user stated it.",
+                "assumed-value": "Assumed, not verified.",
+            ],
+            "documented String enum cases carry their doc comments, keyed by raw value"
         )
     }
 
